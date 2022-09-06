@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 // RefCell will enforce the borrowing rules at runtime instead of statically.
 // If you break the rules, the program will panic
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 
 pub struct List<T> {
     head: Link<T>,
@@ -66,6 +66,15 @@ impl<T> List<T> {
             Rc::try_unwrap(old_head).ok().unwrap().into_inner().elem
         })
     }
+
+    pub fn peek_front(&self) -> Option<Ref<T>> {
+        self.head.as_ref().map(|node| {
+            // It seems like in order to pass a borrowed reference
+            // from a RefCell, you have to pass either a Ref or RefMut
+            // Ref::map(Ref<T>, ..) -> Ref<U>
+            Ref::map(node.borrow(), |node| &node.elem)
+        })
+    }
 }
 
 impl<T> Drop for List<T> {
@@ -105,5 +114,16 @@ mod test {
         // Check exhaustion
         assert_eq!(list.pop_front(), Some(1));
         assert_eq!(list.pop_front(), None);
+    }
+
+    #[test]
+    fn peek() {
+        let mut list = List::new();
+        assert!(list.peek_front().is_none());
+        list.push_front(1);
+        list.push_front(2);
+        list.push_front(3);
+
+        assert_eq!(&*list.peek_front().unwrap(), &3);
     }
 }
