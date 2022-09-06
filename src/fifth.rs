@@ -10,7 +10,12 @@ pub struct List<T> {
     tail: *mut Node<T>,
 }
 
-type Link<T> = Option<Box<Node<T>>>;
+// Mixing smart pointers and raw pointers is a recipe for Undefined Behavior
+// because the safe pointers introduce extra constraints that we're not
+// obeying with the raw pointers.
+//
+// With raw pointers, `Option` is not as nice or useful either
+type Link<T> = *mut Node<T>;
 
 struct Node<T> {
     elem: T,
@@ -20,38 +25,47 @@ struct Node<T> {
 impl<T> List<T> {
     pub fn new() -> Self {
         List {
-            head: None,
+            head: ptr::null_mut(),
             tail: ptr::null_mut(),
         }
     }
 
     pub fn push(&mut self, elem: T) {
-        let mut new_tail = Box::new(Node { elem, next: None });
+        unsafe {
+            // We can use `Box` to allocate memory for us, because the pointer will be
+            // properly aligned and non-null
+            let new_tail = Box::into_raw(Box::new(Node {
+                elem,
+                next: ptr::null_mut(),
+            }));
 
-        // Gotta grab the pointer before the value gets moved later
-        let raw_tail: *mut _ = &mut *new_tail;
-
-        if self.tail.is_null() {
-            self.head = Some(new_tail);
-        } else {
-            unsafe {
-                (*self.tail).next = Some(new_tail);
+            if self.tail.is_null() {
+                self.head = new_tail;
+            } else {
+                (*self.tail).next = new_tail;
             }
-        }
 
-        self.tail = raw_tail;
+            self.tail = new_tail;
+        }
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        self.head.take().map(|head| {
-            self.head = head.next;
+        unsafe {
+            if self.head.is_null() {
+                return None;
+            }
 
-            if self.head.is_none() {
+            // Rebuild smart pointer to drop after it goes out of scope
+            let old_head = Box::from_raw(self.head);
+
+            self.head = old_head.next;
+
+            if self.head.is_null() {
                 self.tail = ptr::null_mut();
             }
 
-            head.elem
-        })
+            Some(old_head.elem)
+        }
     }
 }
 
