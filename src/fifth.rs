@@ -34,6 +34,8 @@ impl<T> List<T> {
         unsafe {
             // We can use `Box` to allocate memory for us, because the pointer will be
             // properly aligned and non-null
+            // 
+            // Box::into_raw consumes the box and returns a raw pointer
             let new_tail = Box::into_raw(Box::new(Node {
                 elem,
                 next: ptr::null_mut(),
