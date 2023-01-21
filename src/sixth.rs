@@ -59,6 +59,26 @@ impl<T> LinkedList<T> {
         }
     }
 
+    pub fn push_back(&mut self, elem: T) {
+        unsafe {
+            let new = NonNull::new_unchecked(Box::into_raw(Box::new(Node {
+                prev: None,
+                next: None,
+                elem,
+            })));
+
+            if let Some(old) = self.tail {
+                (*old.as_ptr()).next = Some(new);
+                (*new.as_ptr()).prev = Some(old);
+            } else {
+                self.head = Some(new);
+            }
+
+            self.tail = Some(new);
+            self.len += 1;
+        }
+    }
+
     pub fn pop_front(&mut self) -> Option<T> {
         unsafe {
             self.head.map(|node| {
@@ -81,8 +101,46 @@ impl<T> LinkedList<T> {
         }
     }
 
+    pub fn pop_back(&mut self) -> Option<T> {
+        unsafe {
+            self.tail.map(|node| {
+                let node = Box::from_raw(node.as_ptr());
+                let elem = node.elem;
+
+                self.tail = node.prev;
+
+                if let Some(new) = self.tail {
+                    (*new.as_ptr()).next = None;
+                } else {
+                    // List is now empty
+                    self.head = None;
+                }
+
+                self.len -= 1;
+
+                elem
+            })
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn front(&self) -> Option<&T> {
+        unsafe { self.head.map(|node| &(*node.as_ptr()).elem) }
+    }
+
+    pub fn back(&self) -> Option<&T> {
+        unsafe { self.tail.map(|node| &(*node.as_ptr()).elem) }
+    }
+
+    pub fn front_mut(&mut self) -> Option<&mut T> {
+        unsafe { self.head.map(|node| &mut (*node.as_ptr()).elem) }
+    }
+
+    pub fn back_mut(&self) -> Option<&mut T> {
+        unsafe { self.tail.map(|node| &mut (*node.as_ptr()).elem) }
     }
 }
 
